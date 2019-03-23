@@ -37,13 +37,16 @@ public class ValidParseTests {
         }
     }
 
-    @Test
-    public void dynamicValidParseTests() {
+    @TestFactory
+    public Collection<DynamicTest> dynamicValidParseTests() {
+        ArrayList<DynamicTest> dynamicTests = new ArrayList<DynamicTest>();
         for (Map.Entry<String, String> testCase : testCases.entrySet()) {
             String path = testCase.getKey();
             String testName = testCase.getValue();
             Executable e = () -> Json.load(path);
-            assertDoesNotThrow(e, testName);
+            Executable x = () -> assertDoesNotThrow(e);
+            dynamicTests.add(DynamicTest.dynamicTest(testName, x));
         }
+        return dynamicTests;
     }
 }
