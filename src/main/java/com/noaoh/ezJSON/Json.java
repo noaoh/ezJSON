@@ -304,6 +304,11 @@ public abstract class Json
             pos += n;
         }
 
+        void retreat(int n)
+        {
+            pos -= n;
+        }
+
         void skipWhitespace()
         {
             while(pos < str.length() && str.charAt(pos) <= ' ')
@@ -684,7 +689,7 @@ public abstract class Json
                         case 'n': sb.append('\n'); break;
                         case 'r': sb.append('\r'); break;
                         case 't': sb.append('\t'); break;
-                        case 'u': throw new RuntimeException("Sorry, unicode characters are not yet supported");
+                        case 'u': p.retreat(1); sb.append(new String(p.until('\\', '\"'))); break;
                         default: throw new RuntimeException("Unrecognized escape sequence");
                     }
                 }
