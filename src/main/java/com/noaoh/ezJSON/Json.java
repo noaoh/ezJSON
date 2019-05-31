@@ -607,7 +607,11 @@ public abstract class Json
         static Json parseNumber(StringParser p)
         {
             String s = p.whileReal();
-            if(s.indexOf('.') >= 0)
+            // Java doesn't support scientific notation for integers, see
+            // https://docs.oracle.com/javase/specs/jls/se12/html/jls-3.html#jls-3.10.1
+            // Additionally, the JSON RFC recommends the IEEE 754 binary64 standard (the double type)
+            // as the encoding for large numbers
+            if(s.indexOf('.') >= 0 || s.indexOf('e') >= 0 || s.indexOf('E') >= 0)
                 return new JDouble(Double.parseDouble(s));
             else
                 return new JLong(Long.parseLong(s));
