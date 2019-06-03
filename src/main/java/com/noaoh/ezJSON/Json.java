@@ -392,16 +392,20 @@ public abstract class Json
             {
                 char c = str.charAt(i);
                 if((c >= '0' && c <= '9') ||
-                        c == '-' ||
+                        (c == '-' ||
                         c == '+' ||
                         c == '.' ||
                         c == 'e' ||
-                        c == 'E')
+                        c == 'E' ||
+                        (int)c == 32 ||
+                        (int)c == 10))
                     i++;
-                else
+                else if (c == ',' || c == ':' || c == ']' || c == '}')
                     break;
+                else
+                    throw new RuntimeException("Invalid character " + c + " in number");
             }
-            String s = str.substring(pos, i);
+            String s = str.substring(pos, i).trim();
             pos = i;
             return s;
         }
@@ -636,6 +640,8 @@ public abstract class Json
                     throw new RuntimeException("Decimal must be followed by a number, not an exponent");
                 } else if (s.indexOf('.') == (s.length() - 1)) {
                     throw new RuntimeException("Decimal must be followed by a number");
+                } else if (s.indexOf('.') == s.indexOf('-') + 1) {
+                    throw new RuntimeException("Decimal numbers must have an integer part");
                 }
                 return new JDouble(Double.parseDouble(s));
             } else {
