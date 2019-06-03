@@ -10,6 +10,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.nio.file.Paths;
 import java.nio.file.Files;
+import java.util.HashSet;
 
 // This class represents a node in a JSON DOM. Here is an example for how to use this class:
 //
@@ -304,6 +305,11 @@ public abstract class Json
             pos += n;
         }
 
+        void retreat(int n)
+        {
+            pos -= n;
+        }
+
         void skipWhitespace()
         {
             while(pos < str.length() && str.charAt(pos) <= ' ')
@@ -331,6 +337,24 @@ public abstract class Json
         {
             int i = pos;
             while(i < str.length() && str.charAt(i) != a && str.charAt(i) != b)
+                i++;
+            String s = str.substring(pos, i);
+            pos = i;
+            return s;
+        }
+
+        String untilEscapeCharacter()
+        {
+            HashSet<Character> escapeChars = new HashSet<Character>();
+            escapeChars.add('\"');
+            escapeChars.add('\\');
+            escapeChars.add('\b');
+            escapeChars.add('\f');
+            escapeChars.add('\n');
+            escapeChars.add('\r');
+            escapeChars.add('\t');
+            int i = pos;
+            while (i < str.length() && !escapeChars.contains(str.charAt(i)))
                 i++;
             String s = str.substring(pos, i);
             pos = i;
@@ -688,7 +712,7 @@ public abstract class Json
                         case 'n': sb.append('\n'); break;
                         case 'r': sb.append('\r'); break;
                         case 't': sb.append('\t'); break;
-                        case 'u': throw new RuntimeException("Sorry, unicode characters are not yet supported");
+                        case 'u': p.retreat(1); sb.append(p.untilEscapeCharacter()); break;
                         default: throw new RuntimeException("Unrecognized escape sequence");
                     }
                 }
