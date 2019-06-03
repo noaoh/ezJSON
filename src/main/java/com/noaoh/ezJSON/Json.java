@@ -639,6 +639,10 @@ public abstract class Json
                 }
                 return new JDouble(Double.parseDouble(s));
             } else {
+                if ((s.indexOf('-') == 0 && s.indexOf('0') == 1 && s.length() > 2) || (s.indexOf('0') == 0 &&
+                        s.length() > 1 && s.indexOf('-') == -1)) {
+                    throw new RuntimeException("Integer cannot have a leading zero");
+                }
                 return new JLong(Long.parseLong(s));
             }
         }
