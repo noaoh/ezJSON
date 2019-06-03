@@ -614,31 +614,33 @@ public abstract class Json
         }
     }
 
-    private static class JDouble extends Json
-    {
+    private static class JDouble extends Json {
         double value;
 
-        JDouble(double val)
-        {
+        JDouble(double val) {
             value = val;
         }
 
-        void write(StringBuilder sb)
-        {
+        void write(StringBuilder sb) {
             sb.append(value);
         }
 
-        static Json parseNumber(StringParser p)
-        {
+        static Json parseNumber(StringParser p) {
             String s = p.whileReal();
             // Java doesn't support scientific notation for integers, see
             // https://docs.oracle.com/javase/specs/jls/se12/html/jls-3.html#jls-3.10.1
             // Additionally, the JSON RFC recommends the IEEE 754 binary64 standard (the double type)
             // as the encoding for large numbers
-            if(s.indexOf('.') >= 0 || s.indexOf('e') >= 0 || s.indexOf('E') >= 0)
+            if (s.indexOf('.') >= 0 || s.indexOf('e') >= 0 || s.indexOf('E') >= 0) {
+                if (s.indexOf('e') == s.indexOf('.') + 1 || s.indexOf('E') == s.indexOf('.') + 1) {
+                    throw new RuntimeException("Decimal must be followed by a number, not an exponent");
+                } else if (s.indexOf('.') == (s.length() - 1)) {
+                    throw new RuntimeException("Decimal must be followed by a number");
+                }
                 return new JDouble(Double.parseDouble(s));
-            else
+            } else {
                 return new JLong(Long.parseLong(s));
+            }
         }
     }
 
