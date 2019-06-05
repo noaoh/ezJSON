@@ -4,12 +4,15 @@
 // ----------------------------------------------------------------
 
 package com.noaoh.ezJSON;
+import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.lang.StringBuilder;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.nio.file.Paths;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.HashSet;
 
 // This class represents a node in a JSON DOM. Here is an example for how to use this class:
@@ -55,6 +58,32 @@ import java.util.HashSet;
 //
 public abstract class Json
 {
+    static byte backspace = 8; // '\b'
+    static byte horizontalTabulation = 9; // '\t'
+    static byte lineFeed = 10; // '\n'
+    static byte formFeed = 12; // '\f'
+    static byte carriageReturn = 13; // '\r'
+    static byte space = 32; // ' '
+    static byte quotationMark = 34; // '\"'
+    static byte apostrophe = 39; // '\''
+    static byte plus = 43; // '+'
+    static byte comma = 44; // ','
+    static byte hypenMinus = 45; // '-'
+    static byte fullStop = 46; // '.'
+    static byte zero = 49; // '0'
+    static byte nine = 57; // '9'
+    static byte colon = 58; // ':'
+    static byte E = 69; // 'E'
+    static byte leftSquareBracket = 91; // '['
+    static byte reverseSolidus = 92; // '\'
+    static byte rightSquareBracket = 93; // ']'
+    static byte e = 101; // 'e'
+    static byte leftCurlyBracket = 123; // '{'
+    static byte rightCurlyBracket = 125; // '}'
+    static byte[] jsonTrue = new byte[] {116, 114, 117, 101}; // "true"
+    static byte[] jsonFalse = new byte[] {102, 97, 108, 115, 101}; // "false"
+    static byte[] jsonNull = new byte[] {110, 117, 108, 108}; // "null"
+
     abstract void write(StringBuilder sb);
 
     public static Json newObject()
@@ -67,37 +96,40 @@ public abstract class Json
         return new JList();
     }
 
-    public static Json parseNode(StringParser p)
+    public static Json parseNode(ByteParser p)
     {
         p.skipWhitespace();
         if(p.remaining() == 0)
             throw new RuntimeException("Unexpected end of JSON file");
-        char c = p.peek();
-        if(c == '"')
+        byte c = p.peek();
+        if(c == quotationMark)
             return new JString(JString.parseString(p));
-        else if(c == '{')
+        else if(c == leftCurlyBracket)
             return JObject.parseObject(p);
-        else if(c == '[')
+        else if(c == leftSquareBracket)
             return JList.parseList(p);
-        else if(c == 't')
+        else if(c == jsonTrue[0])
         {
-            p.expect("true");
+            p.expect(jsonTrue);
             return new JBool(true);
         }
-        else if(c == 'f')
+        else if(c == jsonFalse[0])
         {
-            p.expect("false");
+            p.expect(jsonFalse);
             return new JBool(false);
         }
-        else if(c == 'n')
+        else if(c == jsonNull[0])
         {
-            p.expect("null");
+            p.expect(jsonNull);
             return new JNull();
         }
-        else if((c >= '0' && c <= '9') || c == '-')
+        else if((c >= zero && c <= nine) || c == hypenMinus)
             return JDouble.parseNumber(p);
         else
-            throw new RuntimeException("Unexpected token at " + p.str.substring(p.pos, Math.min(p.remaining(), 50)));
+        {
+            byte[] slice = ByteBuffer.wrap(p.contents, p.pos, Math.min(p.remaining(), 50)).array();
+            throw new RuntimeException("Unexpected token at " + slice);
+        }
     }
 
     public int size()
@@ -259,18 +291,18 @@ public abstract class Json
         }
     }
 
-    public static Json parse(String s)
+    public static Json parse(byte[] b)
     {
-        StringParser p = new StringParser(s);
+        ByteParser p = new ByteParser(b);
         return Json.parseNode(p);
     }
 
     public static Json load(String filename)
     {
-        String contents;
+        byte[] contents;
         try
         {
-            contents = new String(Files.readAllBytes(Paths.get(filename)));
+            contents = Files.readAllBytes(Paths.get(filename));
         }
         catch(Exception e)
         {
@@ -279,25 +311,25 @@ public abstract class Json
         return parse(contents);
     }
 
-    public static class StringParser
+    public static class ByteParser
     {
-        String str;
+        byte[] contents;
         int pos;
 
-        StringParser(String s)
+        ByteParser(byte[] c)
         {
-            str = s;
+            contents = c;
             pos = 0;
         }
 
         int remaining()
         {
-            return str.length() - pos;
+            return contents.length - pos;
         }
 
-        char peek()
+        byte peek()
         {
-            return str.charAt(pos);
+            return contents[pos];
         }
 
         void advance(int n)
@@ -312,100 +344,87 @@ public abstract class Json
 
         void skipWhitespace()
         {
-            while(pos < str.length() && str.charAt(pos) <= ' ')
+            while(pos < contents.length && contents[pos] <= space)
                 pos++;
         }
 
-        void expect(String s)
+        void expect(byte[] b)
         {
-            if(!str.substring(pos, Math.min(str.length(), pos + s.length())).equals(s))
-                throw new RuntimeException("Expected \"" + s + "\", Got \"" + str.substring(pos, Math.min(str.length(), pos + s.length())) + "\"");
-            pos += s.length();
+            int length = Math.min(contents.length, pos + contents.length);
+            byte[] contentsSlice = ByteBuffer.wrap(contents, pos, length).array();
+            if(!Arrays.equals(contentsSlice, b))
+                throw new RuntimeException("Expected \"" + b + "\", Got \"" + contentsSlice + "\"");
+            pos += contentsSlice.length;
         }
 
-        String until(char c)
+        void expect(byte b)
+        {
+            if (contents[pos] != b)
+                throw new RuntimeException("Expected \"" + b + "\", Got \"" + contents[pos] + "\"");
+            pos += 1;
+        }
+
+        byte[] until(byte c)
         {
             int i = pos;
-            while(i < str.length() && str.charAt(i) != c)
+            while(i < contents.length && contents[i] != c)
                 i++;
-            String s = str.substring(pos, i);
+            byte[] b = ByteBuffer.wrap(contents, pos, i).array();
             pos = i;
-            return s;
+            return b;
         }
 
-        String until(char a, char b)
+        byte[] until(byte a, byte b)
         {
             int i = pos;
-            while(i < str.length() && str.charAt(i) != a && str.charAt(i) != b)
+            while(i < contents.length && contents[i] != a && contents[i] != b)
                 i++;
-            String s = str.substring(pos, i);
+            byte[] slice = ByteBuffer.wrap(contents, pos, i).array();
             pos = i;
-            return s;
+            return slice;
         }
 
-        String untilEscapeCharacter()
-        {
-            HashSet<Character> escapeChars = new HashSet<Character>();
-            escapeChars.add('\"');
-            escapeChars.add('\\');
-            escapeChars.add('\b');
-            escapeChars.add('\f');
-            escapeChars.add('\n');
-            escapeChars.add('\r');
-            escapeChars.add('\t');
-            int i = pos;
-            while (i < str.length() && !escapeChars.contains(str.charAt(i)))
-                i++;
-            String s = str.substring(pos, i);
-            pos = i;
-            return s;
-        }
-
-        String untilWhitespace()
+        byte[] untilEscapeCharacter()
         {
             int i = pos;
-            while(i < str.length() && str.charAt(i) > ' ')
+            byte b = contents[i];
+            while (i < contents.length &&
+                    b != quotationMark &&
+                    b != backspace &&
+                    b != formFeed &&
+                    b != lineFeed &&
+                    b != carriageReturn &&
+                    b != horizontalTabulation
+            ) {
                 i++;
-            String s = str.substring(pos, i);
-            pos = i;
-            return s;
-        }
-
-        String untilQuoteSensitive(char a, char b)
-        {
-            if(peek() == '"')
-            {
-                advance(1);
-                String s = "\"" + until('"') + "\"";
-                advance(1);
-                until(a, b);
-                return s;
+                b = contents[i];
             }
-            else
-                return until(a, b);
+            byte[] slice = ByteBuffer.wrap(contents, pos, i).array();
+            pos = i;
+            return slice;
         }
 
-        String whileReal()
+        byte[] whileReal()
         {
             int i = pos;
-            while(i < str.length())
+            while(i < contents.length)
             {
-                char c = str.charAt(i);
-                if((c >= '0' && c <= '9') ||
-                        (c == '-' ||
-                        c == '+' ||
-                        c == '.' ||
-                        c == 'e' ||
-                        c == 'E' ||
-                        (int)c == 32 ||
-                        (int)c == 10))
+                byte c = contents[i];
+                if((c >= zero && c <= nine) ||
+                        (c == hypenMinus ||
+                        c == plus ||
+                        c == fullStop ||
+                        c == e ||
+                        c == E ||
+                        c == space ||
+                        c == lineFeed))
                     i++;
-                else if (c == ',' || c == ':' || c == ']' || c == '}')
+                else if (c == comma || c == colon || c == rightSquareBracket || c == rightCurlyBracket)
                     break;
                 else
                     throw new RuntimeException("Invalid character " + c + " in number");
             }
-            String s = str.substring(pos, i).trim();
+            byte[] s = ByteBuffer.wrap(contents, pos, i).array();
             pos = i;
             return s;
         }
@@ -474,44 +493,47 @@ public abstract class Json
             sb.append("}");
         }
 
-        static JObject parseObject(StringParser p)
+        static JObject parseObject(ByteParser p)
         {
-            p.expect("{");
+            p.expect(leftCurlyBracket);
             JObject newOb = new JObject();
             boolean readyForField = true;
             while(p.remaining() > 0)
             {
-                char c = p.peek();
-                if(c <= ' ')
+                byte c = p.peek();
+                if(c <= space)
                 {
                     p.advance(1);
                 }
-                else if(c == '}')
+                else if(c == rightCurlyBracket)
                 {
                     p.advance(1);
                     return newOb;
                 }
-                else if(c == ',')
+                else if(c == comma)
                 {
                     if(readyForField)
                         throw new RuntimeException("Unexpected ','");
                     p.advance(1);
                     readyForField = true;
                 }
-                else if(c == '\"')
+                else if(c == quotationMark)
                 {
                     if(!readyForField)
                         throw new RuntimeException("Expected a ',' before the next field in JSON file");
                     p.skipWhitespace();
                     String name = JString.parseString(p);
                     p.skipWhitespace();
-                    p.expect(":");
+                    p.expect(colon);
                     Json value = Json.parseNode(p);
                     newOb.add(name, value);
                     readyForField = false;
                 }
                 else
-                    throw new RuntimeException("Expected a '}' or a '\"'. Got " + p.str.substring(p.pos, p.pos + 10));
+                {
+                    byte[] slice = ByteBuffer.wrap(p.contents, p.pos, p.pos + 10).array();
+                    throw new RuntimeException("Expected a '}' or a '\"'. Got " + slice);
+                }
             }
             throw new RuntimeException("Expected a matching '}' in JSON file");
         }
@@ -555,21 +577,21 @@ public abstract class Json
             sb.append("]");
         }
 
-        static JList parseList(StringParser p)
+        static JList parseList(ByteParser p)
         {
-            p.expect("[");
+            p.expect(leftSquareBracket);
             JList newList = new JList();
             boolean readyForValue = true;
             while(p.remaining() > 0)
             {
                 p.skipWhitespace();
-                char c = p.peek();
-                if(c == ']')
+                byte c = p.peek();
+                if(c == rightSquareBracket)
                 {
                     p.advance(1);
                     return newList;
                 }
-                else if(c == ',')
+                else if(c == comma)
                 {
                     if(readyForValue)
                         throw new RuntimeException("Unexpected ',' in JSON file");
@@ -629,8 +651,8 @@ public abstract class Json
             sb.append(value);
         }
 
-        static Json parseNumber(StringParser p) {
-            String s = p.whileReal();
+        static Json parseNumber(ByteParser p) {
+            String s = new String(p.whileReal());
             // Java doesn't support scientific notation for integers, see
             // https://docs.oracle.com/javase/specs/jls/se12/html/jls-3.html#jls-3.10.1
             // Additionally, the JSON RFC recommends the IEEE 754 binary64 standard (the double type)
@@ -697,19 +719,35 @@ public abstract class Json
             write(sb, value);
         }
 
-        static String parseString(StringParser p)
+        static void isValidUTF8String(String s)
+        {
+            byte[] utf8_bytes= null;
+            try
+            {
+                utf8_bytes= s.getBytes("UTF8");
+                String utf8_string = new String(utf8_bytes, "UTF8");
+            }
+            catch (UnsupportedEncodingException e)
+            {
+               throw new RuntimeException("String " + s + " is not a valid UTF8 string");
+            }
+        }
+
+        static String parseString(ByteParser p)
         {
             StringBuilder sb = new StringBuilder();
-            p.expect("\"");
+            p.expect(quotationMark);
             while(p.remaining() > 0)
             {
-                char c = p.peek();
-                if(c == '\"')
+                byte c = p.peek();
+                if(c == quotationMark)
                 {
                     p.advance(1);
-                    return sb.toString();
+                    String s = sb.toString();
+                    isValidUTF8String(s);
+                    return s;
                 }
-                else if(c == '\\')
+                else if(c == reverseSolidus)
                 {
                     p.advance(1);
                     c = p.peek();
